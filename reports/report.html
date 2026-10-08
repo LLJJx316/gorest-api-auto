@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>report.html</title>
+    <style>body {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  /* do not increase min-width as some may use split screens */
+  min-width: 800px;
+  color: #999;
+}
+
+h1 {
+  font-size: 24px;
+  color: black;
+}
+
+h2 {
+  font-size: 16px;
+  color: black;
+}
+
+p {
+  color: black;
+}
+
+a {
+  color: #999;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+/******************************
+ * SUMMARY INFORMATION
+ ******************************/
+#environment td {
+  padding: 5px;
+  border: 1px solid #E6E6E6;
+}
+#environment tr:nth-child(odd) {
+  background-color: #f6f6f6;
+}
+
+/******************************
+ * TEST RESULT COLORS
+ ******************************/
+span.passed,
+.passed .col-result {
+  color: green;
+}
+
+span.skipped,
+span.xfailed,
+span.rerun,
+.skipped .col-result,
+.xfailed .col-result,
+.rerun .col-result {
+  color: orange;
+}
+
+span.error,
+span.failed,
+span.xpassed,
+.error .col-result,
+.failed .col-result,
+.xpassed .col-result {
+  color: red;
+}
+
+/******************************
+ * RESULTS TABLE
+ *
+ * 1. Table Layout
+ * 2. Extra
+ * 3. Sorting items
+ *
+ ******************************/
+/*------------------
+ * 1. Table Layout
+ *------------------*/
+#results-table {
+  border: 1px solid #e6e6e6;
+  color: #999;
+  font-size: 12px;
+  width: 100%;
+}
+#results-table th,
+#results-table td {
+  padding: 5px;
+  border: 1px solid #E6E6E6;
+  text-align: left;
+}
+#results-table th {
+  font-weight: bold;
+}
+
+/*------------------
+ * 2. Extra
+ *------------------*/
+.log {
+  background-color: #e6e6e6;
+  border: 1px solid #e6e6e6;
+  color: black;
+  display: block;
+  font-family: "Courier New", Courier, monospace;
+  height: 230px;
+  overflow-y: scroll;
+  padding: 5px;
+  white-space: pre-wrap;
+}
+.log:only-child {
+  height: inherit;
+}
+
+div.image {
+  border: 1px solid #e6e6e6;
+  float: right;
+  height: 240px;
+  margin-left: 5px;
+  overflow: hidden;
+  width: 320px;
+}
+div.image img {
+  width: 320px;
+}
+
+div.video {
+  border: 1px solid #e6e6e6;
+  float: right;
+  height: 240px;
+  margin-left: 5px;
+  overflow: hidden;
+  width: 320px;
+}
+div.video video {
+  overflow: hidden;
+  width: 320px;
+  height: 240px;
+}
+
+.collapsed {
+  display: none;
+}
+
+.expander::after {
+  content: " (show details)";
+  color: #BBB;
+  font-style: italic;
+  cursor: pointer;
+}
+
+.collapser::after {
+  content: " (hide details)";
+  color: #BBB;
+  font-style: italic;
+  cursor: pointer;
+}
+
+/*------------------
+ * 3. Sorting items
+ *------------------*/
+.sortable {
+  cursor: pointer;
+}
+
+.sort-icon {
+  font-size: 0px;
+  float: left;
+  margin-right: 5px;
+  margin-top: 5px;
+  /*triangle*/
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+}
+.inactive .sort-icon {
+  /*finish triangle*/
+  border-top: 8px solid #E6E6E6;
+}
+.asc.active .sort-icon {
+  /*finish triangle*/
+  border-bottom: 8px solid #999;
+}
+.desc.active .sort-icon {
+  /*finish triangle*/
+  border-top: 8px solid #999;
+}
+</style></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function findAll(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sortColumn(elem) {
+    toggleSortStates(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('result')) {
+        key = keyResult;
+    } else if (elem.classList.contains('links')) {
+        key = keyLink;
+    } else {
+        key = keyAlpha;
+    }
+    sortTable(elem, key(colIndex));
+}
+
+function showAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(showExtras);
+}
+
+function hideAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(hideExtras);
+}
+
+function showExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hideExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function showFilters() {
+    let visibleString = getQueryParameter('visible') || 'all';
+    visibleString = visibleString.toLowerCase();
+    const checkedItems = visibleString.split(',');
+
+    const filterItems = document.getElementsByClassName('filter');
+    for (let i = 0; i < filterItems.length; i++) {
+        filterItems[i].hidden = false;
+
+        if (visibleString != 'all') {
+            filterItems[i].checked = checkedItems.includes(filterItems[i].getAttribute('data-test-result'));
+            filterTable(filterItems[i]);
+        }
+    }
+}
+
+function addCollapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:showAllExtras()">Show all details</a> / ' +
+                            '<a href="javascript:hideAllExtras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    findAll('.col-result').forEach(function(elem) {
+        const collapsed = getQueryParameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                showExtras(event.currentTarget);
+            } else {
+                hideExtras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function getQueryParameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    resetSortHeaders();
+
+    addCollapse();
+
+    showFilters();
+
+    sortColumn(find('.initial-sort'));
+
+    findAll('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sortColumn(elem);
+            }, false);
+    });
+}
+
+function sortTable(clicked, keyFunc) {
+    const rows = findAll('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sortedRows = sort(rows, keyFunc, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sortedRows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, keyFunc, reversed) {
+    const sortArray = items.map(function(item, i) {
+        return [keyFunc(item), i];
+    });
+
+    sortArray.sort(function(a, b) {
+        const keyA = a[0];
+        const keyB = b[0];
+
+        if (keyA == keyB) return 0;
+
+        if (reversed) {
+            return keyA < keyB ? 1 : -1;
+        } else {
+            return keyA > keyB ? 1 : -1;
+        }
+    });
+
+    return sortArray.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function keyAlpha(colIndex) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[colIndex].firstChild.data.toLowerCase();
+    };
+}
+
+function keyLink(colIndex) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[colIndex].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function keyResult(colIndex) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[colIndex].firstChild.data);
+    };
+}
+
+function resetSortHeaders() {
+    findAll('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    findAll('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggleSortStates(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        resetSortHeaders();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function isAllRowsHidden(value) {
+    return value.hidden == false;
+}
+
+function filterTable(elem) { // eslint-disable-line no-unused-vars
+    const outcomeAtt = 'data-test-result';
+    const outcome = elem.getAttribute(outcomeAtt);
+    const classOutcome = outcome + ' results-table-row';
+    const outcomeRows = document.getElementsByClassName(classOutcome);
+
+    for(let i = 0; i < outcomeRows.length; i++){
+        outcomeRows[i].hidden = !elem.checked;
+    }
+
+    const rows = findAll('.results-table-row').filter(isAllRowsHidden);
+    const allRowsHidden = rows.length == 0 ? true : false;
+    const notFoundMessage = document.getElementById('not-found-message');
+    notFoundMessage.hidden = !allRowsHidden;
+}
+</script>
+    <h1>report.html</h1>
+    <p>Report generated on 05-Oct-2026 at 21:22:44 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.2.0</p>
+    <h2>Summary</h2>
+    <p>8 tests ran in 11.68 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="passed">8 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="failed">0 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable" col="duration">Duration</th>
+          <th class="sortable links" col="links">Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">cases/test_user_boundary.py::TestUserBoundary::test_create_user_name_max_50</td>
+          <td class="col-duration">4.35</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>===== test_create_user_name_max_50 =====
+name长度：50
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">cases/test_user_boundary.py::TestUserBoundary::test_create_user_age_min_18</td>
+          <td class="col-duration">0.54</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>===== test_create_user_age_min_18 =====
+响应状态码:201
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">cases/test_user_crud.py::TestUserCrud::test_get_user_list[1]</td>
+          <td class="col-duration">0.62</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>=====test_get_user_list=====
+请求URL: /users
+请求参数params: {&#x27;page&#x27;: 1, &#x27;per_page&#x27;: 10}
+响应状态码:200
+响应JSON:[{&#x27;id&#x27;: 8650832, &#x27;name&#x27;: &#x27;Test user&#x27;, &#x27;email&#x27;: &#x27;test3e3f3da7@example.com&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;active&#x27;}, {&#x27;id&#x27;: 8650831, &#x27;name&#x27;: &#x27;aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&#x27;, &#x27;email&#x27;: &#x27;test03cd75d7@example.com&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;active&#x27;}, {&#x27;id&#x27;: 8649609, &#x27;name&#x27;: &#x27;Anala Gupta III&#x27;, &#x27;email&#x27;: &#x27;anala_iii_gupta@lueilwitz-collins.test&#x27;, &#x27;gender&#x27;: &#x27;female&#x27;, &#x27;status&#x27;: &#x27;active&#x27;}, {&#x27;id&#x27;: 8649608, &#x27;name&#x27;: &#x27;Bhadran Khatri&#x27;, &#x27;email&#x27;: &#x27;bhadran_khatri@raynor-roob.example&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;inactive&#x27;}, {&#x27;id&#x27;: 8649607, &#x27;name&#x27;: &#x27;Bala Gill&#x27;, &#x27;email&#x27;: &#x27;bala_gill@fadel-reichel.test&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;inactive&#x27;}, {&#x27;id&#x27;: 8649606, &#x27;name&#x27;: &#x27;Damodara Abbott&#x27;, &#x27;email&#x27;: &#x27;abbott_damodara@kirlin.test&#x27;, &#x27;gender&#x27;: &#x27;female&#x27;, &#x27;status&#x27;: &#x27;active&#x27;}, {&#x27;id&#x27;: 8649605, &#x27;name&#x27;: &#x27;Fr. Dakshayani Varman&#x27;, &#x27;email&#x27;: &#x27;varman_fr_dakshayani@bins.test&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;active&#x27;}, {&#x27;id&#x27;: 8649604, &#x27;name&#x27;: &#x27;Deependra Varrier&#x27;, &#x27;email&#x27;: &#x27;deependra_varrier@johnston.example&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;inactive&#x27;}, {&#x27;id&#x27;: 8649603, &#x27;name&#x27;: &#x27;Manoj Acharya&#x27;, &#x27;email&#x27;: &#x27;manoj_acharya@reichert.test&#x27;, &#x27;gender&#x27;: &#x27;female&#x27;, &#x27;status&#x27;: &#x27;active&#x27;}, {&#x27;id&#x27;: 8649602, &#x27;name&#x27;: &#x27;Chakravartee Johar&#x27;, &#x27;email&#x27;: &#x27;chakravartee_johar@rath-parisian.example&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;inactive&#x27;}]
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">cases/test_user_crud.py::TestUserCrud::test_get_user_list[2]</td>
+          <td class="col-duration">0.87</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>=====test_get_user_list=====
+请求URL: /users
+请求参数params: {&#x27;page&#x27;: 2, &#x27;per_page&#x27;: 10}
+响应状态码:200
+响应JSON:[{&#x27;id&#x27;: 8649601, &#x27;name&#x27;: &#x27;Sushma Menon&#x27;, &#x27;email&#x27;: &#x27;menon_sushma@windler-shanahan.example&#x27;, &#x27;gender&#x27;: &#x27;female&#x27;, &#x27;status&#x27;: &#x27;inactive&#x27;}, {&#x27;id&#x27;: 8649600, &#x27;name&#x27;: &#x27;Prof. Aatmaja Reddy&#x27;, &#x27;email&#x27;: &#x27;aatmaja_reddy_prof@gerlach-keeling.example&#x27;, &#x27;gender&#x27;: &#x27;female&#x27;, &#x27;status&#x27;: &#x27;inactive&#x27;}, {&#x27;id&#x27;: 8649599, &#x27;name&#x27;: &#x27;Shashi Namboothiri&#x27;, &#x27;email&#x27;: &#x27;namboothiri_shashi@schoen-pouros.example&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;active&#x27;}, {&#x27;id&#x27;: 8649266, &#x27;name&#x27;: &#x27;Bhasvan Bhattacharya Esq.&#x27;, &#x27;email&#x27;: &#x27;bhattacharya_bhasvan_esq@kshlerin-anderson.test&#x27;, &#x27;gender&#x27;: &#x27;female&#x27;, &#x27;status&#x27;: &#x27;active&#x27;}, {&#x27;id&#x27;: 8649265, &#x27;name&#x27;: &#x27;Baalaaditya Mishra&#x27;, &#x27;email&#x27;: &#x27;mishra_baalaaditya@weissnat-tromp.example&#x27;, &#x27;gender&#x27;: &#x27;female&#x27;, &#x27;status&#x27;: &#x27;active&#x27;}, {&#x27;id&#x27;: 8649263, &#x27;name&#x27;: &#x27;Digambara Patel&#x27;, &#x27;email&#x27;: &#x27;patel_digambara@bradtke-thiel.example&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;active&#x27;}, {&#x27;id&#x27;: 8649262, &#x27;name&#x27;: &#x27;Jaya Dhawan&#x27;, &#x27;email&#x27;: &#x27;jaya_dhawan@abernathy.test&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;inactive&#x27;}, {&#x27;id&#x27;: 8649261, &#x27;name&#x27;: &#x27;Vaishnavi Nayar&#x27;, &#x27;email&#x27;: &#x27;nayar_vaishnavi@schmeler.test&#x27;, &#x27;gender&#x27;: &#x27;female&#x27;, &#x27;status&#x27;: &#x27;inactive&#x27;}, {&#x27;id&#x27;: 8649260, &#x27;name&#x27;: &#x27;Ayushmati Patil&#x27;, &#x27;email&#x27;: &#x27;ayushmati_patil@murray-heathcote.test&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;inactive&#x27;}, {&#x27;id&#x27;: 8649259, &#x27;name&#x27;: &#x27;Rajinder Pillai&#x27;, &#x27;email&#x27;: &#x27;rajinder_pillai@friesen.example&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;inactive&#x27;}]
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">cases/test_user_crud.py::TestUserCrud::test_get_single_user</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>===== test_get_single_user =====
+请求URL: /users/8650833
+响应状态码: 200
+响应JSON: {&#x27;id&#x27;: 8650833, &#x27;name&#x27;: &#x27;Test user&#x27;, &#x27;email&#x27;: &#x27;test_a604b183@example.com&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;active&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">cases/test_user_crud.py::TestUserCrud::test_get_user</td>
+          <td class="col-duration">0.56</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>===== test_get_user(新增用户) =====
+请求URL: /users
+请求BODY: {&#x27;name&#x27;: &#x27;Test user&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;active&#x27;, &#x27;email&#x27;: &#x27;testa392909f@example.com&#x27;}
+响应状态码: 201
+响应JSON: {&#x27;id&#x27;: 8650834, &#x27;name&#x27;: &#x27;Test user&#x27;, &#x27;email&#x27;: &#x27;testa392909f@example.com&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;active&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">cases/test_user_crud.py::TestUserCrud::test_update_user</td>
+          <td class="col-duration">1.22</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>===== test_update_user =====
+新建用户请求BODY: {&#x27;name&#x27;: &#x27;Test user&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;active&#x27;, &#x27;email&#x27;: &#x27;test97579559@example.com&#x27;}
+待修改用户ID: 8650835
+PUT请求URL: /users/8650835
+修改请求BODY: {&#x27;name&#x27;: &#x27;Updated Wang&#x27;, &#x27;status&#x27;: &#x27;inactive&#x27;}
+响应状态码: 200
+响应JSON: {&#x27;id&#x27;: 8650835, &#x27;name&#x27;: &#x27;Updated Wang&#x27;, &#x27;email&#x27;: &#x27;test97579559@example.com&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;inactive&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">cases/test_user_crud.py::TestUserCrud::test_delete_user</td>
+          <td class="col-duration">2.21</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>===== test_delete_user =====
+新建用户请求BODY: {&#x27;name&#x27;: &#x27;Test user&#x27;, &#x27;gender&#x27;: &#x27;male&#x27;, &#x27;status&#x27;: &#x27;active&#x27;, &#x27;email&#x27;: &#x27;testff08fe45@example.com&#x27;}
+待删除用户ID: 8650837
+DELETE请求URL: /users/8650837
+响应状态码: 204
+<br/></div></td></tr></tbody></table></body></html>

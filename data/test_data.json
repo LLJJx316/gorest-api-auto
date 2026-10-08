@@ -1,0 +1,15 @@
+{
+  "base_url": "https://gorest.co.in/public/v2",
+  "access_token": "a44458b48fe8d19e07ea25e87aa619058fe991765b776732a182ebb6b64b056a",
+  "user": {
+    "create": {
+      "name": "Test user",
+      "gender": "male",
+      "status": "active"
+    },
+    "update": {
+      "name": "Updated Wang",
+      "status": "inactive"
+    }
+  }
+}

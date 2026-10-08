@@ -1,0 +1,14 @@
+# PyCharm配置
+.idea/
+__pycache__/
+*.pyc
+venv/
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
+# 其他项目文件（go相关，不需要）
+*.go
+go.mod
+go.sum
